@@ -5,13 +5,13 @@
 class Motor {
 
     public:
-        Motor(int pwmControl, int in1Pin, int in2Pin);
+        Motor(uint8_t pwmControl, uint8_t in1Pin, uint8_t in2Pin);
 
         void moveFoward();
         void moveBack();
-        void moveFoward(int pwmIntensity);
-        void moveBack(int pwmIntensity);
-        void setIntensity(int intensity);
+        void moveFoward(uint8_t pwmIntensity);
+        void moveBack(uint8_t pwmIntensity);
+        void setIntensity(uint8_t intensity);
         void stop();
 
 
