@@ -3,20 +3,32 @@
 #include <Ultrasonic.h>
 
 #include <defines.h>
+#include <types.h>
 
 Ultrasonic sensorUltrasonico(TRIGGER_PIN, ECHO_PIN);
 
 Motor motorEsquerdo = Motor(MOTOR_ESQUERDO_PWM, MOTOR_ESQUERDO_IN1, MOTOR_ESQUERDO_IN2);
 Motor motorDireito = Motor(MOTOR_DIREITO_PWM, MOTOR_DIREITO_IN1, MOTOR_DIREITO_IN2);
 
-enum DIRECAO {
-    PARADO,
-    FRENTE,
-    RE,
-    ESQUERDA,
-    DIREITA
-};
+/**                                                                                         
+ * ===========================================================================================
+ *                              Variáveis                                                   ||
+ * ===========================================================================================
+ * */
 
+Direcao direcao = PARADO;
+Estado estado = PROCURANDO_OPONENTE;
+
+unsigned long ultimaAcaoExecutada = 0;
+unsigned long tempoMovimentacaoMotores = 0;
+
+void procurarOponente();
+void tratarMovimentacao();
+bool sortearParImpar();
+void moverDistanteLinha();
+void verificarLinhas();
+Direcao sortearEsquerdaDireita();
+void marcarTempoUltimaMovimentacaoMotores();
 bool continuaExecutando(unsigned long tempo);
 void frente();
 void re();
@@ -24,115 +36,181 @@ void parar();
 void virarDireita();
 void virarEsquerda();
 
-void setup() {
-  // put your setup code here, to run once:
+void trataInterrupcao()
+{
+#ifdef DEBUG
+  LOG("trataInterrupcao: ", digitalRead(SENSOR_LINHA_CENTRAL), LINE_FEED);
+#endif
+  moverDistanteLinha();
+}
+
+void setup()
+{
   Serial.begin(9600);
+
+  // attachInterrupt(digitalPinToInterrupt(SENSOR_LINHA_CENTRAL), trataInterrupcao, RISING);
   parar();
   delay(5000);
+#ifdef DEBUG
+  LOG("INICIADO...", "", "");
+#endif
 }
-  
-int distance;
-DIRECAO direcao = FRENTE;
 
-unsigned long ultimaExecucao = 0;
+void loop()
+{
+  procurarOponente();
+  verificarLinhas();
+  tratarMovimentacao();
 
-void loop() {
+  delay(1000);
+}
 
-  
-  if(direcao == FRENTE) {
-    distance = sensorUltrasonico.read();
-      if(distance < 10) {
-          direcao = RE;
-          ultimaExecucao = millis();
-      }
+void verificarLinhas()
+{
+  bool sensorEsquerda, sensorCentro;
+  sensorEsquerda = digitalRead(SENSOR_LINHA_ESQUERDA);
+  sensorCentro = digitalRead(SENSOR_LINHA_CENTRAL);
+#ifdef DEBUG
+  LOG(sensorEsquerda, " - ", sensorCentro);
+  QUEBRA_LINHA();
+#endif
+  if (sensorEsquerda || sensorCentro)
+  {
+    moverDistanteLinha();
   }
-  switch (direcao) {
-    case FRENTE:
-      frente();
-      break;
-    case RE:
-      if(continuaExecutando(DELAY_RE)){
-        re();
-      }else {
-        parar();
-        randomSeed(analogRead(A0));
-        int dir = random(1, 11);
-        if(dir % 2){
-          direcao = DIREITA;
-        }else {
-          direcao = ESQUERDA;
-        }
-        ultimaExecucao = millis();
-      }
-      break;
-    case DIREITA:
-      if(continuaExecutando(DELAY_VIRAR)){
-        virarDireita();
-      }else {       
-        parar(); 
-        direcao = FRENTE;
-      }
-      break;
-    case ESQUERDA:
-      if(continuaExecutando(DELAY_VIRAR)){
-        virarEsquerda(); 
-      }else {        
-        parar();
-        direcao = FRENTE;
-      }
-      break;  
-    default: 
-      parar();
-      break;  
+}
+
+void procurarOponente()
+{
+  int distanciaObstaculo = sensorUltrasonico.read();
+  if (distanciaObstaculo > DISTANCIA_MINIMA_PERSEGUIR)
+  {
+    direcao = sortearEsquerdaDireita();
+#ifdef DEBUG
+    LOG("procurarOponente: ", direcao, LINE_FEED);
+#endif
+    tempoMovimentacaoMotores = TEMPO_VIRADA_PROCURAR_OPONENTE;
+    marcarTempoUltimaMovimentacaoMotores();
   }
+  else
+  {
+    direcao = FRENTE;
+  }
+  estado = MOVIMENTANDO;
+}
 
-  
+void tratarMovimentacao()
+{
+  switch (direcao)
+  {
+  case FRENTE:
+    frente();
+    break;
+  case RE:
+    if (continuaExecutando(tempoMovimentacaoMotores))
+    {
+      re();
+    }
+    else
+    {
+      estado = PROCURANDO_OPONENTE;
+    }
+    break;
+  case DIREITA:
+    if (continuaExecutando(tempoMovimentacaoMotores))
+    {
+      virarDireita();
+    }
+    else
+    {
+      estado = PROCURANDO_OPONENTE;
+    }
+    break;
+  case ESQUERDA:
+    if (continuaExecutando(tempoMovimentacaoMotores))
+    {
+      virarEsquerda();
+    }
+    else
+    {
+      estado = PROCURANDO_OPONENTE;
+    }
+    break;
+  case PARADO:
+    parar();
+    break;
+  }
 #ifdef DEBUG
-    LOG("DIR: ");
-    LOG(direcao);
-    LOG("\n");
+  LOG("Direção: ", direcao, LINE_FEED);
 #endif
-
 }
 
-bool continuaExecutando(unsigned long tempo) {
-    unsigned long tempoPassado = (millis() - ultimaExecucao);
-    
+void moverDistanteLinha()
+{
+  direcao = RE;
+  estado = MOVIMENTANDO;
+  tempoMovimentacaoMotores = TEMPO_FUGIR_LINHA;
+  marcarTempoUltimaMovimentacaoMotores();
+}
+
+bool sortearParImpar()
+{
+  randomSeed(analogRead(A0) + analogRead(A5));
+  int numero = random(1, 11);
+  return numero % 2;
+}
+
+Direcao sortearEsquerdaDireita()
+{
+  return sortearParImpar() ? DIREITA : ESQUERDA;
+}
+
+void marcarTempoUltimaMovimentacaoMotores()
+{
+  ultimaAcaoExecutada = millis();
+}
+
+bool continuaExecutando(unsigned long tempo)
+{
+
+  unsigned long tempoPassado = (millis() - ultimaAcaoExecutada);
+
 #ifdef DEBUG
-    LOG("T: ");
-    LOG(tempoPassado);
-    LOG("\n");
+  LOG("Tempo passado: ", tempoPassado, LINE_FEED);
 #endif
-    bool continua = tempoPassado < tempo;
+  bool continua = tempoPassado < tempo;
 #ifdef DEBUG
-    LOG(" CONT: ");
-    LOG(continua);
-    LOG("\n");
+  LOG("Continua?: ", continua, LINE_FEED);
 #endif
-   return continua; 
+  return continua;
 }
 
-void frente() { 
-    motorEsquerdo.moveFoward();
-    motorDireito.moveFoward();
+void frente()
+{
+  motorEsquerdo.moveFoward();
+  motorDireito.moveFoward();
 }
 
-void re() {
-    motorEsquerdo.moveBack();
-    motorDireito.moveBack();
+void re()
+{
+  motorEsquerdo.moveBack();
+  motorDireito.moveBack();
 }
 
-void virarDireita() {
+void virarDireita()
+{
   parar();
   motorEsquerdo.moveFoward();
 }
 
-void virarEsquerda() {
+void virarEsquerda()
+{
   parar();
   motorDireito.moveFoward();
 }
 
-void parar() {
+void parar()
+{
   motorEsquerdo.stop();
   motorDireito.stop();
 }
