@@ -5,23 +5,24 @@
 #include <defines.h>
 #include <types.h>
 
-Ultrasonic sensorUltrasonico(TRIGGER_PIN, ECHO_PIN);
-
-Motor motorEsquerdo = Motor(MOTOR_ESQUERDO_PWM, MOTOR_ESQUERDO_IN1, MOTOR_ESQUERDO_IN2);
-Motor motorDireito = Motor(MOTOR_DIREITO_PWM, MOTOR_DIREITO_IN1, MOTOR_DIREITO_IN2);
-
 /**                                                                                         
  * ===========================================================================================
  *                              Variáveis                                                   ||
  * ===========================================================================================
  * */
-
+Ultrasonic sensorUltrasonico(TRIGGER_PIN, ECHO_PIN);
+Motor motorEsquerdo = Motor(MOTOR_ESQUERDO_PWM, MOTOR_ESQUERDO_IN1, MOTOR_ESQUERDO_IN2);
+Motor motorDireito = Motor(MOTOR_DIREITO_PWM, MOTOR_DIREITO_IN1, MOTOR_DIREITO_IN2);
 Direcao direcao = PARADO;
 Estado estado = PROCURANDO_OPONENTE;
-
 unsigned long ultimaAcaoExecutada = 0;
 unsigned long tempoMovimentacaoMotores = 0;
 
+/**                                                                                         
+ * ===========================================================================================
+ *                              Protótipo de Funções                                        ||
+ * ===========================================================================================
+ * */
 void procurarOponente();
 void tratarMovimentacao();
 bool sortearParImpar();
@@ -47,9 +48,8 @@ void trataInterrupcao()
 void setup()
 {
   Serial.begin(9600);
-
-  // attachInterrupt(digitalPinToInterrupt(SENSOR_LINHA_CENTRAL), trataInterrupcao, RISING);
   parar();
+  attachInterrupt(digitalPinToInterrupt(SENSOR_LINHA_CENTRAL), trataInterrupcao, RISING);
   delay(5000);
 #ifdef DEBUG
   LOG("INICIADO...", "", "");
@@ -58,11 +58,17 @@ void setup()
 
 void loop()
 {
-  procurarOponente();
-  verificarLinhas();
-  tratarMovimentacao();
+  switch (estado)
+  {
+  case PROCURANDO_OPONENTE:
+    procurarOponente();
+    break;
 
-  delay(1000);
+  case MOVIMENTANDO:
+    tratarMovimentacao();
+    break;
+  }
+  verificarLinhas();
 }
 
 void verificarLinhas()
@@ -172,7 +178,6 @@ void marcarTempoUltimaMovimentacaoMotores()
 
 bool continuaExecutando(unsigned long tempo)
 {
-
   unsigned long tempoPassado = (millis() - ultimaAcaoExecutada);
 
 #ifdef DEBUG
