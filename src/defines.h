@@ -16,11 +16,12 @@
 #define DISTANCIA_MINIMA_PERSEGUIR 25
 #define TEMPO_FUGIR_LINHA 500
 #define TEMPO_VIRADA_PROCURAR_OPONENTE 350
+#define TEMPO_SEGUINDO_EM_FRENTE 250
 
 // #define DEBUG
 
 #ifdef DEBUG
     #define LOG(prefixo, valor, sufixo) Serial.print(prefixo); Serial.print(valor); Serial.print(sufixo)
     #define QUEBRA_LINHA() Serial.println();
-    #define LINE_FEED \n
+    #define LINE_FEED "\n"
 #endif
