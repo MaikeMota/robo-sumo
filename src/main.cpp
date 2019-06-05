@@ -13,9 +13,9 @@
 Ultrasonic sensorUltrasonico(TRIGGER_PIN, ECHO_PIN);
 Motor motorEsquerdo = Motor(MOTOR_ESQUERDO_PWM, MOTOR_ESQUERDO_IN1, MOTOR_ESQUERDO_IN2);
 Motor motorDireito = Motor(MOTOR_DIREITO_PWM, MOTOR_DIREITO_IN1, MOTOR_DIREITO_IN2);
-Direcao direcao = PARADO;
+Direcao direcao;
 Estado estado = PROCURANDO_OPONENTE;
-unsigned long ultimaAcaoExecutada = 0;
+unsigned long ultimaMovimentacaoMotorExecutada = 0;
 unsigned long tempoMovimentacaoMotores = 0;
 
 /**                                                                                         
@@ -26,6 +26,7 @@ unsigned long tempoMovimentacaoMotores = 0;
 void procurarOponente();
 void tratarMovimentacao();
 bool sortearParImpar();
+void moverParaFrente();
 void moverDistanteLinha();
 void verificarLinhas();
 Direcao sortearEsquerdaDireita();
@@ -36,39 +37,19 @@ void re();
 void parar();
 void virarDireita();
 void virarEsquerda();
-
-void trataInterrupcao()
-{
-#ifdef DEBUG
-  LOG("trataInterrupcao: ", digitalRead(SENSOR_LINHA_CENTRAL), LINE_FEED);
-#endif
-  moverDistanteLinha();
-}
-
-void setup()
-{
-  Serial.begin(9600);
-  parar();
-  attachInterrupt(digitalPinToInterrupt(SENSOR_LINHA_CENTRAL), trataInterrupcao, RISING);
-  delay(5000);
-#ifdef DEBUG
-  LOG("INICIADO...", "", "");
-#endif
-}
+void trataInterrupcao();
 
 void loop()
 {
+  verificarLinhas();
   switch (estado)
   {
   case PROCURANDO_OPONENTE:
     procurarOponente();
     break;
-
   case MOVIMENTANDO:
     tratarMovimentacao();
-    break;
   }
-  verificarLinhas();
 }
 
 void verificarLinhas()
@@ -86,31 +67,43 @@ void verificarLinhas()
   }
 }
 
+bool isDistanciaMinima() {  
+  int distanciaObstaculo = sensorUltrasonico.read();
+#ifdef DEBUG
+  LOG("distanciaObstaculo: ", distanciaObstaculo, LINE_FEED);
+#endif
+  return distanciaObstaculo <= DISTANCIA_MINIMA_PERSEGUIR;
+}
+
 void procurarOponente()
 {
-  int distanciaObstaculo = sensorUltrasonico.read();
-  if (distanciaObstaculo > DISTANCIA_MINIMA_PERSEGUIR)
+  if (isDistanciaMinima())
   {
-    direcao = sortearEsquerdaDireita();
-#ifdef DEBUG
-    LOG("procurarOponente: ", direcao, LINE_FEED);
-#endif
-    tempoMovimentacaoMotores = TEMPO_VIRADA_PROCURAR_OPONENTE;
-    marcarTempoUltimaMovimentacaoMotores();
+    moverParaFrente();
   }
   else
   {
-    direcao = FRENTE;
+    direcao = sortearEsquerdaDireita();
+    tempoMovimentacaoMotores = TEMPO_VIRADA_PROCURAR_OPONENTE;
+    marcarTempoUltimaMovimentacaoMotores();
   }
+#ifdef DEBUG
+    LOG("procurarOponente: ", direcao, LINE_FEED);
+#endif
   estado = MOVIMENTANDO;
 }
 
 void tratarMovimentacao()
 {
+  parar();
   switch (direcao)
   {
   case FRENTE:
-    frente();
+    if (continuaExecutando(tempoMovimentacaoMotores)){
+      frente();
+    }else {
+      estado = PROCURANDO_OPONENTE;
+    }
     break;
   case RE:
     if (continuaExecutando(tempoMovimentacaoMotores))
@@ -119,7 +112,7 @@ void tratarMovimentacao()
     }
     else
     {
-      estado = PROCURANDO_OPONENTE;
+      moverParaFrente();
     }
     break;
   case DIREITA:
@@ -129,7 +122,7 @@ void tratarMovimentacao()
     }
     else
     {
-      estado = PROCURANDO_OPONENTE;
+      moverParaFrente();
     }
     break;
   case ESQUERDA:
@@ -139,11 +132,8 @@ void tratarMovimentacao()
     }
     else
     {
-      estado = PROCURANDO_OPONENTE;
+      moverParaFrente();
     }
-    break;
-  case PARADO:
-    parar();
     break;
   }
 #ifdef DEBUG
@@ -151,17 +141,26 @@ void tratarMovimentacao()
 #endif
 }
 
+void moverParaFrente(){ 
+  direcao = FRENTE;
+  tempoMovimentacaoMotores = TEMPO_SEGUINDO_EM_FRENTE;
+  marcarTempoUltimaMovimentacaoMotores();
+  estado = MOVIMENTANDO;
+}
+
 void moverDistanteLinha()
 {
+  parar();
   direcao = RE;
-  estado = MOVIMENTANDO;
   tempoMovimentacaoMotores = TEMPO_FUGIR_LINHA;
   marcarTempoUltimaMovimentacaoMotores();
+  estado = MOVIMENTANDO;
 }
 
 bool sortearParImpar()
 {
-  randomSeed(analogRead(A0) + analogRead(A5));
+  long seed = (analogRead(A0) + (analogRead(A5))) / analogRead(A1);
+  randomSeed(seed) ;
   int numero = random(1, 11);
   return numero % 2;
 }
@@ -173,12 +172,12 @@ Direcao sortearEsquerdaDireita()
 
 void marcarTempoUltimaMovimentacaoMotores()
 {
-  ultimaAcaoExecutada = millis();
+  ultimaMovimentacaoMotorExecutada = millis();
 }
 
 bool continuaExecutando(unsigned long tempo)
 {
-  unsigned long tempoPassado = (millis() - ultimaAcaoExecutada);
+  unsigned long tempoPassado = (millis() - ultimaMovimentacaoMotorExecutada);
 
 #ifdef DEBUG
   LOG("Tempo passado: ", tempoPassado, LINE_FEED);
@@ -188,6 +187,27 @@ bool continuaExecutando(unsigned long tempo)
   LOG("Continua?: ", continua, LINE_FEED);
 #endif
   return continua;
+}
+
+void trataInterrupcao()
+{
+#ifdef DEBUG
+  LOG("trataInterrupcao: ", digitalRead(SENSOR_LINHA_CENTRAL), LINE_FEED);
+#endif
+  moverDistanteLinha();
+}
+
+void setup()
+{
+  Serial.begin(9600);
+  parar();
+  attachInterrupt(digitalPinToInterrupt(SENSOR_LINHA_CENTRAL), trataInterrupcao, RISING);
+  motorDireito.setIntensity(255);
+  motorEsquerdo.setIntensity(255);
+  delay(5000);
+#ifdef DEBUG
+  LOG("INICIADO...", "", "");
+#endif
 }
 
 void frente()
@@ -204,13 +224,11 @@ void re()
 
 void virarDireita()
 {
-  parar();
   motorEsquerdo.moveFoward();
 }
 
 void virarEsquerda()
 {
-  parar();
   motorDireito.moveFoward();
 }
 
