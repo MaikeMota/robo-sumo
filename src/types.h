@@ -1,6 +1,5 @@
 enum Direcao
 {
-  PARADO,
   FRENTE,
   RE,
   ESQUERDA,
