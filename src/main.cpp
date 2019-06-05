@@ -49,7 +49,13 @@ void setup()
 {
   Serial.begin(9600);
   parar();
+
+#ifdef ARENA_CLARA
   attachInterrupt(digitalPinToInterrupt(SENSOR_LINHA_CENTRAL), trataInterrupcao, RISING);
+#endif
+#ifdef ARENA_ESCURA
+  attachInterrupt(digitalPinToInterrupt(SENSOR_LINHA_CENTRAL), trataInterrupcao, FALLING);
+#endif
   delay(5000);
 #ifdef DEBUG
   LOG("INICIADO...", "", "");
@@ -80,7 +86,12 @@ void verificarLinhas()
   LOG(sensorEsquerda, " - ", sensorCentro);
   QUEBRA_LINHA();
 #endif
+#ifdef ARENA_CLARA
   if (sensorEsquerda || sensorCentro)
+#endif
+#ifdef 
+  if (!sensorEsquerda || !sensorCentro)
+#endif
   {
     moverDistanteLinha();
   }
