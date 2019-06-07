@@ -47,7 +47,9 @@ void trataInterrupcao()
 
 void setup()
 {
+#ifdef DEBUG
   Serial.begin(9600);
+#endif
   parar();
 
 #ifdef ARENA_CLARA
@@ -69,7 +71,6 @@ void loop()
   case PROCURANDO_OPONENTE:
     procurarOponente();
     break;
-
   case MOVIMENTANDO:
     tratarMovimentacao();
     break;
@@ -89,7 +90,7 @@ void verificarLinhas()
 #ifdef ARENA_CLARA
   if (sensorEsquerda || sensorCentro)
 #endif
-#ifdef 
+#ifdef ARENA_ESCURA
   if (!sensorEsquerda || !sensorCentro)
 #endif
   {
