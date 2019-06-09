@@ -39,6 +39,33 @@ void virarDireita();
 void virarEsquerda();
 void trataInterrupcao();
 
+void trataInterrupcao()
+{
+#ifdef DEBUG
+  LOG("trataInterrupcao: ", digitalRead(SENSOR_LINHA_CENTRAL), LINE_FEED);
+#endif
+  moverDistanteLinha();
+}
+
+void setup()
+{
+#ifdef DEBUG
+  Serial.begin(9600);
+#endif
+  parar();
+
+#ifdef ARENA_CLARA
+  attachInterrupt(digitalPinToInterrupt(SENSOR_LINHA_CENTRAL), trataInterrupcao, RISING);
+#endif
+#ifdef ARENA_ESCURA
+  attachInterrupt(digitalPinToInterrupt(SENSOR_LINHA_CENTRAL), trataInterrupcao, FALLING);
+#endif
+  delay(5000);
+#ifdef DEBUG
+  LOG("INICIADO...", "", "");
+#endif
+}
+
 void loop()
 {
   verificarLinhas();
@@ -61,7 +88,12 @@ void verificarLinhas()
   LOG(sensorEsquerda, " - ", sensorCentro);
   QUEBRA_LINHA();
 #endif
+#ifdef ARENA_CLARA
   if (sensorEsquerda || sensorCentro)
+#endif
+#ifdef ARENA_ESCURA
+  if (!sensorEsquerda || !sensorCentro)
+#endif
   {
     moverDistanteLinha();
   }

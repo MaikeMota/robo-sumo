@@ -18,6 +18,10 @@
 #define TEMPO_VIRADA_PROCURAR_OPONENTE 350
 #define TEMPO_SEGUINDO_EM_FRENTE 250
 
+#define ARENA_CLARA
+
+//#define ARENA_ESCURA
+
 // #define DEBUG
 
 #ifdef DEBUG
